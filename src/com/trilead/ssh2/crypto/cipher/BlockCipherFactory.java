@@ -45,6 +45,8 @@ public class BlockCipherFactory
 		
 		ciphers.addElement(new CipherEntry("3des-ctr", 8, 24, "com.trilead.ssh2.crypto.cipher.DESede"));
 		ciphers.addElement(new CipherEntry("3des-cbc", 8, 24, "com.trilead.ssh2.crypto.cipher.DESede"));
+
+		ciphers.addElement(new CipherEntry("aes256-gcm", 16, 32, "com.trilead.ssh2.crypto.cipher.AESGCM"));
 	}
 
 	public static String[] getDefaultCipherList()
@@ -81,8 +83,15 @@ public class BlockCipherFactory
 			{
 				bc.init(true, key);
 				return new CTRMode(bc, iv, encrypt);
+			}  else if (type.endsWith("-gcm")) { // New GCM support
+				if (bc instanceof AESGCM) {
+					((AESGCM) bc).setIV(iv);
+				}
+				bc.init(encrypt, key);
+				return new AESGCM(bc, iv, encrypt);
 			}
-			throw new IllegalArgumentException("Cannot instantiate " + type);
+
+				throw new IllegalArgumentException("Cannot instantiate " + type);
 		}
 		catch (Exception e)
 		{
