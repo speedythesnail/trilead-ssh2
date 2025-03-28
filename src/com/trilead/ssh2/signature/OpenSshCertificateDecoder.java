@@ -175,6 +175,12 @@ abstract class OpenSshCertificateDecoder extends CertificateDecoder {
             BlockCipher createBlockCipher(byte[] key, byte[] iv, boolean encrypt) {
                 return BlockCipherFactory.createCipher("aes256-ctr", encrypt, key, iv);
             }
+        },
+        AES256_GCM(32, 16, "aes-256-gcm@openssh.com") {
+            @Override
+            BlockCipher createBlockCipher(byte[] key, byte[] iv, boolean encrypt) {
+                return BlockCipherFactory.createCipher("aes-256-gcm", encrypt, key, iv);
+            }
         };
 
         private final String[] sshCipherNames;

@@ -11,7 +11,7 @@ trilead-ssh2-build-217-jenkins-16, 2019-03-31:
 - Connection timeout handler not cancelled when an exception occurs during a connection attempt. If the Connection instance is reused for further attempts, this can lead to the disconnection of an active connection.
 - [JENKINS-56821] Eliminating hot lock from `TimeoutService`
 
-trilead-ssh2-build-217-jenkins-14, 2018-10-18:
+trilead-ssh2-build-217-jenkins-14, 2018-10-18Ï:
 
 - fix warnings and errors in javadoc 
 - [JENKINS-53651] wait for a timeout time if the packets have 0 size 

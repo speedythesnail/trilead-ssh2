@@ -34,6 +34,11 @@
             <name>Ivan Fernandez</name>
             <email>kuisathaverat@gmail.com</email>
         </developer>
+        <developer>
+            <id>speedythesnail</id>
+            <name>Steven Jubb</name>
+            <email>steven.jubb@outlook.com</email>
+        </developer>
     </developers>
 
     <scm>
@@ -166,6 +171,7 @@
                                     <excludes combine.children="append">
                                         <exclude>org.connectbot.jbcrypt</exclude>
                                     </excludes>
+                                    <version>[17]</version>
                                 </enforceBytecodeVersion>
                             </rules>
                         </configuration>
@@ -179,8 +185,9 @@
         <revision>build-217-jenkins</revision>
         <changelist>999999-SNAPSHOT</changelist>
         <gitHubRepo>jenkinsci/trilead-ssh2</gitHubRepo>
-        <!-- TODO fix medium-threshold violations -->
         <spotbugs.threshold>High</spotbugs.threshold>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
     </properties>
 
 </project>

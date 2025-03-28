@@ -1,6 +1,7 @@
 
 package com.trilead.ssh2.crypto.cipher;
 
+import javax.crypto.Cipher;
 import java.util.Vector;
 
 /**
@@ -16,9 +17,9 @@ public class BlockCipherFactory
 		String type;
 		int blocksize;
 		int keysize;
-		String cipherClass;
+		Class<?> cipherClass;
 
-		public CipherEntry(String type, int blockSize, int keySize, String cipherClass)
+		public CipherEntry(String type, int blockSize, int keySize, Class<?> cipherClass)
 		{
 			this.type = type;
 			this.blocksize = blockSize;
@@ -27,24 +28,25 @@ public class BlockCipherFactory
 		}
 	}
 
-	static Vector ciphers = new Vector();
+	static Vector<CipherEntry> ciphers = new Vector<>();
 
 	static
 	{
 		/* Higher Priority First */
+		ciphers.addElement(new CipherEntry("aes256-gcm@openssh.com", 16, 32, com.trilead.ssh2.crypto.cipher.AES.class));
 
-		ciphers.addElement(new CipherEntry("aes256-ctr", 16, 32, "com.trilead.ssh2.crypto.cipher.AES"));
-		ciphers.addElement(new CipherEntry("aes192-ctr", 16, 24, "com.trilead.ssh2.crypto.cipher.AES"));
-		ciphers.addElement(new CipherEntry("aes128-ctr", 16, 16, "com.trilead.ssh2.crypto.cipher.AES"));
-		ciphers.addElement(new CipherEntry("blowfish-ctr", 8, 16, "com.trilead.ssh2.crypto.cipher.BlowFish"));
+		ciphers.addElement(new CipherEntry("aes256-ctr", 16, 32, com.trilead.ssh2.crypto.cipher.AES.class));
+		ciphers.addElement(new CipherEntry("aes192-ctr", 16, 24, com.trilead.ssh2.crypto.cipher.AES.class));
+		ciphers.addElement(new CipherEntry("aes128-ctr", 16, 16, com.trilead.ssh2.crypto.cipher.AES.class));
+		ciphers.addElement(new CipherEntry("blowfish-ctr", 8, 16, com.trilead.ssh2.crypto.cipher.BlowFish.class));
 
-		ciphers.addElement(new CipherEntry("aes256-cbc", 16, 32, "com.trilead.ssh2.crypto.cipher.AES"));
-		ciphers.addElement(new CipherEntry("aes192-cbc", 16, 24, "com.trilead.ssh2.crypto.cipher.AES"));
-		ciphers.addElement(new CipherEntry("aes128-cbc", 16, 16, "com.trilead.ssh2.crypto.cipher.AES"));
-		ciphers.addElement(new CipherEntry("blowfish-cbc", 8, 16, "com.trilead.ssh2.crypto.cipher.BlowFish"));
+		ciphers.addElement(new CipherEntry("aes256-cbc", 16, 32, com.trilead.ssh2.crypto.cipher.AES.class));
+		ciphers.addElement(new CipherEntry("aes192-cbc", 16, 24, com.trilead.ssh2.crypto.cipher.AES.class));
+		ciphers.addElement(new CipherEntry("aes128-cbc", 16, 16, com.trilead.ssh2.crypto.cipher.AES.class));
+		ciphers.addElement(new CipherEntry("blowfish-cbc", 8, 16, com.trilead.ssh2.crypto.cipher.BlowFish.class));
 		
-		ciphers.addElement(new CipherEntry("3des-ctr", 8, 24, "com.trilead.ssh2.crypto.cipher.DESede"));
-		ciphers.addElement(new CipherEntry("3des-cbc", 8, 24, "com.trilead.ssh2.crypto.cipher.DESede"));
+		ciphers.addElement(new CipherEntry("3des-ctr", 8, 24, com.trilead.ssh2.crypto.cipher.DESede.class));
+		ciphers.addElement(new CipherEntry("3des-cbc", 8, 24, com.trilead.ssh2.crypto.cipher.DESede.class));
 	}
 
 	public static String[] getDefaultCipherList()
@@ -64,30 +66,44 @@ public class BlockCipherFactory
 			getEntry(cipherCandidates[i]);
 	}
 
-	public static BlockCipher createCipher(String type, boolean encrypt, byte[] key, byte[] iv)
-	{
-		try
-		{
-			CipherEntry ce = getEntry(type);
-			Class cc = Class.forName(ce.cipherClass);
-			BlockCipher bc = (BlockCipher) cc.newInstance();
+	public static BlockCipher createCipher(String type, boolean encrypt, byte[] key, byte[] iv) {
+		CipherEntry cipherEntry = getEntry(type);
+		Class<?> cipherClass = cipherEntry.cipherClass;
+		BlockCipher blockCipher;
 
-			if (type.endsWith("-cbc"))
-			{
-				bc.init(encrypt, key);
-				return new CBCMode(bc, iv, encrypt);
-			}
-			else if (type.endsWith("-ctr"))
-			{
-				bc.init(true, key);
-				return new CTRMode(bc, iv, encrypt);
-			}
-			throw new IllegalArgumentException("Cannot instantiate " + type);
+		try {
+			blockCipher = (BlockCipher) cipherClass.getDeclaredConstructor().newInstance();
+			String modeType = getModeTypeFromType(type); // Extract mode suffix from type
+
+            return switch (modeType) {
+                case "cbc" -> createCBCMode(blockCipher, encrypt, key, iv);
+                case "ctr" -> createCTRMode(blockCipher, key, iv, encrypt);
+                case "gcm@openssh.com" -> createGCMMode(blockCipher, key, iv, encrypt);
+                default -> throw new IllegalArgumentException("Unsupported mode type: " + type);
+            };
+		} catch (Exception e) {
+			throw new IllegalArgumentException("Cannot instantiate " + type, e);
 		}
-		catch (Exception e)
-		{
-			throw new IllegalArgumentException("Cannot instantiate " + type);
-		}
+	}
+
+	private static String getModeTypeFromType(String type) {
+		int lastDashIndex = type.lastIndexOf('-');
+		return (lastDashIndex != -1) ? type.substring(lastDashIndex + 1) : "";
+	}
+
+	private static BlockCipher createCBCMode(BlockCipher blockCipher, boolean encrypt, byte[] key, byte[] iv) {
+		blockCipher.init(encrypt, key);
+		return new CBCMode(blockCipher, iv, encrypt);
+	}
+
+	private static BlockCipher createCTRMode(BlockCipher blockCipher, byte[] key, byte[] iv, boolean encrypt) {
+		blockCipher.init(true, key); // Always init CTR with `encrypt = true`
+		return new CTRMode(blockCipher, iv, encrypt);
+	}
+
+	private static BlockCipher createGCMMode(BlockCipher blockCipher, byte[] key, byte[] iv, boolean encrypt) {
+		blockCipher.init(true, key); // Always init GCM with `encrypt = true`
+		return new GCMMode(blockCipher, iv, encrypt);
 	}
 
 	private static CipherEntry getEntry(String type)
@@ -98,7 +114,7 @@ public class BlockCipherFactory
 			if (ce.type.equals(type))
 				return ce;
 		}
-		throw new IllegalArgumentException("Unkown algorithm " + type);
+		throw new IllegalArgumentException("Unknown algorithm " + type);
 	}
 
 	public static int getBlockSize(String type)
